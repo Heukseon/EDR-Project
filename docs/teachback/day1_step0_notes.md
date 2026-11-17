@@ -11,7 +11,7 @@
 | 링크 | 질문 | 내 답 |
 |---|---|---|
 | OpenSearch Mappings, Keyword 타입 | 호스트 이름 `WS-007`은 text와 keyword 중 무엇으로 저장해야 할까? 왜? | **keyword**. text로 저장하면 분석기가 `ws`, `007`처럼 쪼개고 소문자로 바꾼다. 그러면 정확 일치 필터나 집계가 틀어진다. 호스트 이름은 통째로 같은지만 보면 되므로 keyword가 맞다. |
-| OpenSearch Term-level queries | "WS-007에서 09:00~09:30 사이에 일어난 일"을 찾으려면 어떤 검색 두 가지를 섞어야 할까? | `host`에 **term** 검색, `@timestamp`에 **range** 검색. 둘을 `bool`의 `filter`로 묶는다. |
+| OpenSearch Term-level queries | "WS-007에서 09:00~09:30 사이에 일어난 일"을 찾으려면 어떤 검색 두 가지를 섞어야 할까? | `host`에 **term** 검색, `ts`(우리 스키마의 시간 칸)에 **range** 검색. 둘을 `bool`의 `filter`로 묶는다. |
 
 **실습에서 어디에 쓰나:** 3-🔍-2 인덱스 템플릿(REC-1)의 필드 타입 결정, 3-🔍-3 `get_host_timeline`(REC-4)의 검색 조건
 
