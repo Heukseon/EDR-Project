@@ -117,7 +117,6 @@ edr-ai-triage-lab/
 ├─ PROJECT_GUIDE.md         ← 이 문서 (새로 만듦)
 ├─ CHANGES.md               ← 원래 문서의 문제점과 바꾼 내용 (새로 만듦)
 ├─ README.md / README_CODE.md   원래 입구 문서, 코드 실행 안내
-├─ INSTRUCTOR_NEXT_STEPS.md     강사용 메모 (학생은 무시, 내용도 옛날 상태)
 ├─ .env.example             설정 견본 → 복사해서 .env로
 ├─ Dockerfile, Dockerfile.kb    앱 이미지, PDF 적재 전용 이미지 (2~3일차)
 ├─ data/
