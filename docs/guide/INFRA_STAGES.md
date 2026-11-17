@@ -69,6 +69,8 @@
 curl -s localhost:9200/_cluster/health | jq .status    # "green" 또는 "yellow"
 psql postgresql://soc:soc@localhost:5432/soc -c 'select 1'
 ```
+> Windows처럼 `jq`, `psql`이 없으면: `curl.exe -s http://localhost:9200/_cluster/health` 결과에서 `"status"`를 눈으로 보고, `docker compose exec postgres psql -U soc -c "select 1"`로 확인합니다.
+> 깨 보기 0-1은 선택 항목인 앱 컨테이너를 만든 경우에만, 0-3은 Linux에서만 할 수 있습니다. Windows라면 0-2를 고르세요.
 
 **🔥 깨 보기 (출제 목록)**
 | # | 넣는 장애 | 진단자가 찾을 단서 |

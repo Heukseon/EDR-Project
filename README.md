@@ -2,6 +2,10 @@
 
 > 모든 데이터와 문서는 실습용 가상 자료입니다.
 
+> **처음이라면 [`START_HERE.md`](START_HERE.md)부터 보세요.** 환경 준비부터 3일차까지 순서대로 따라 하는 한 장 계획표입니다.
+> 프로젝트 설명은 [`PROJECT_GUIDE.md`](PROJECT_GUIDE.md), 원래 문서의 오류와 바꾼 내용은 [`CHANGES.md`](CHANGES.md)에 있습니다.
+> 개발 환경 설치는 [`README_CODE.md`](README_CODE.md) 1장에 있습니다 (1일차 첫 명령 전에 필요).
+
 ## 읽는 순서
 
 | 순서 | 문서 | 내용 |

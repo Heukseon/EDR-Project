@@ -103,7 +103,11 @@
    - 시간은 `date`, pid는 `long`, IP는 `ip`
    - 명령줄은 `text`와 `keyword` 둘 다 (전문 검색도, 정확 일치도)
 2. 왜 `text`와 `keyword`를 나눴는지 `DECISIONS.md`에 한 줄로 적습니다. (03 문서 1장의 질문에 대한 내 답)
-3. 시뮬레이터를 OpenSearch 모드로 돌려 기록을 넣고, 들어간 개수를 확인합니다.
+3. 기록을 OpenSearch에 넣고, 들어간 개수를 확인합니다.
+   ```bash
+   python -m soc.telemetry.index_template --load data/sim.jsonl
+   ```
+   템플릿이 `dynamic: strict`라서 `src/soc/schema.py`의 칸이 매핑에 하나라도 빠지면 기록이 거절됩니다.
 
 > ⏸ **여기서 멈추고 3-👥 중간 나눔으로 갑니다.**
 
@@ -135,7 +139,8 @@
 #### 3-📘-1. 9개 PDF를 '그냥' 파싱해 보기
 **왜:** 파싱 방법은 문서를 **보고 나서** 정합니다. 02 문서 9-2에서 눈으로 본 PDF를, 이번에는 컴퓨터가 어떻게 읽는지 봅니다.
 1. [`data/kb/README.md`](../../data/kb/README.md)를 읽습니다.
-2. 제공 스크립트로 9개 PDF를 기본 방법(`fast`)으로 파싱하고, 요소의 종류와 개수를 봅니다.
+2. **먼저 3-📘-2의 TODO[DOC-1](`parse.py`의 `partition()` 호출)만 채웁니다.** 아래 제공 스크립트가 내부에서 이 함수를 부르기 때문에, 비어 있으면 `NotImplementedError`로 멈춥니다.
+   그다음 9개 PDF를 기본 방법(`fast`)으로 파싱하고, 요소의 종류와 개수를 봅니다.
    ```bash
    python -m soc.kb.inspect --strategy fast
    ```
@@ -162,7 +167,7 @@
 
 #### 3-📘-4. RAG 평가 첫 측정
 ```bash
-python -m soc.eval.rag_eval     # data/kb/eval_questions.jsonl 21문항 → 정답 문서가 상위 3개 안에 드는 비율(Recall@3)
+python -m soc.eval.rag_eval --mode all     # 21문항, 키워드만 / 벡터만 / 합친 것의 Recall@3 비교 (--mode all이 없으면 합친 것만 나옴)
 ```
 - 결과를 `DECISIONS.md`에 기록합니다. **스캔본(k10), 차트 숫자(k12), 09번 표(k15~k21)는 지금은 틀리는 게 정상**입니다. 3일차 고도화 과제예요.
 - 키워드 검색만, 벡터 검색만, 둘을 합친 것의 결과를 비교해 보세요. 특히 **k13·k14(한국어 질문 → 영어 문서)**에서는 무엇이 이기나요?
@@ -217,14 +222,15 @@ python -m soc.eval.rag_eval     # data/kb/eval_questions.jsonl 21문항 → 정�
 - **운전 규칙: 상대가 만든 도구를 내가 연결합니다.**
   - 조사 노드(🔍 도구를 씀)는 **📘 문서 담당이 운전**
   - 권고 노드(📘 검색을 씀)는 **🔍 기록 담당이 운전**
+- 채울 곳: **TODO[AG-1]** 조사 노드 `nodes.py` `investigate()` (운전 📘), **TODO[AG-2]** 권고 노드 `nodes.py` `recommend()` (운전 🔍), **TODO[AG-3]** 엣지 연결 `graph.py` `build_graph()` (함께)
 - 오늘은 **가짜 도구(`mocks.py`)와 가짜 LLM**으로 그래프가 끝까지 흐르는 것만 확인합니다.
   ```bash
   pytest tests/test_graph_skeleton.py -q
   python -m soc.agent.graph            # Mermaid 그림 출력 → ARCHITECTURE.md에 붙이기
   ```
-- 가드레일과 승인 노드는 2일차에 합니다.
+- 가드레일과 승인 노드는 2일차에 합니다. 노드 자체는 이미 그래프에 있지만, 그때까지는 검사 없이 통과만 하는 빈 껍데기입니다.
 
-✅ **확인:** 가짜 알림 하나를 넣으면 지나온 경로에 `조사 → 도구 → 조사 → 판정 → 권고 → 리포트`가 찍힌다.
+✅ **확인:** 가짜 알림 하나를 넣으면 지나온 경로에 `조사 → 도구 → 조사 → 판정 → (가드레일) → 권고 → (승인) → 리포트`가 찍힌다. 괄호 친 두 노드는 아직 빈 껍데기라 통과만 합니다.
 
 ---
 
