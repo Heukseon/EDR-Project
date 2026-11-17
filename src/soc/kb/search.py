@@ -41,7 +41,14 @@ def rrf_fuse(result_lists: list[list[dict]], top_n: int) -> list[dict]:
     """여러 검색 결과를 순위로 합칩니다. 결과 하나하나에는 "id"가 있습니다."""
     # TODO[DOC-5]: 결과 목록마다 순위(1부터)를 매겨 문서 id별로 1 / (RRF_K + 순위)를 더하고,
     # 합계가 큰 순서로 top_n개를 돌려줍니다. 돌려줄 때 "score"를 RRF 점수로 바꿉니다.
-    raise NotImplementedError("TODO[DOC-5]")
+    scores: dict[str, float] = {}
+    docs: dict[str, dict] = {}
+    for results in result_lists:
+        for rank, hit in enumerate(results, start=1):
+            scores[hit["id"]] = scores.get(hit["id"], 0.0) + 1 / (RRF_K + rank)
+            docs.setdefault(hit["id"], hit)
+    top = sorted(scores, key=scores.get, reverse=True)[:top_n]
+    return [docs[i] | {"score": scores[i]} for i in top]
 
 
 def search(query: str, k: int = 3, mode: str = "hybrid") -> list[dict]:

@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: edr-ai-triage
+Version: 1.0.0
+Summary: EDR AI 트리아지 에이전트 실습 (2인 1조 · 3일)
+Requires-Python: >=3.11

@@ -1,0 +1,32 @@
+# 인프라 0단계: 내 PC에서 OpenSearch, Dashboards, Postgres 띄우기 (D1-3)
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    environment:
+      - discovery.type=single-node            # 노드 1개짜리 클러스터
+      - DISABLE_SECURITY_PLUGIN=true          # 실습용: 로그인/TLS 없이 http로 접속
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g    # 힙 1GB
+    ports: ["9200:9200"]
+    volumes: [osdata:/usr/share/opensearch/data]
+
+  dashboards:
+    image: opensearchproject/opensearch-dashboards:2.17.1
+    environment:
+      - 'OPENSEARCH_HOSTS=["http://opensearch:9200"]'   # 컨테이너끼리는 localhost가 아니라 서비스 이름
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    ports: ["5601:5601"]
+    depends_on: [opensearch]
+
+  postgres:
+    image: postgres:16
+    environment:                              # .env의 POSTGRES_DSN(postgresql://soc:soc@localhost:5432/soc)과 같아야 함
+      POSTGRES_USER: soc
+      POSTGRES_PASSWORD: soc
+      POSTGRES_DB: soc
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+volumes:
+  osdata:
+  pgdata:
