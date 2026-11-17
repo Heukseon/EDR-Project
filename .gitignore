@@ -7,3 +7,5 @@ data/sim_labels.jsonl
 data/eval/
 dist/
 .pytest_cache/
+*.egg-info/
+.DS_Store
