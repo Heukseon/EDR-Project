@@ -44,7 +44,11 @@ def investigate(state: TriageState) -> dict:
     # TODO[AG-1]: telemetry_tools()를 LLM에 연결(bind_tools)하고, 시스템 프롬프트 + 대화(messages)로 호출합니다.
     # 첫 호출이면 대화가 비어 있으니 알림 메시지(_alert_message)를 먼저 넣습니다.
     # 돌려줄 것: 새 메시지들, trace ["조사"], usage (usage_of(응답))
-    raise NotImplementedError("TODO[AG-1]")
+    history = list(state.get("messages", []))
+    new = [] if history else [_alert_message(state["alert"])]
+    llm = get_llm().bind_tools(telemetry_tools())
+    resp = llm.invoke([SystemMessage(content=prompt("investigate"))] + history + new)
+    return {"messages": new + [resp], "trace": ["조사"], "usage": usage_of(resp)}
 
 
 def run_tools(state: TriageState) -> dict:
