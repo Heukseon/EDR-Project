@@ -25,7 +25,32 @@
 5. **10분 타임라인은 100건을 넘는다.** WS-006에서 공격 시각 앞뒤 ±1분은 11~19건, ±5분은 55~66건, ±10분은 108~152건이다. → `get_host_timeline`을 기본값(minutes=10, 최대 100건)으로 부르면 `truncated: true`가 된다. 기본 범위를 줄일지 중간 나눔에서 상의한다.
 
 ### text vs keyword (1일차)
-<!-- 03 문서 1장의 질문에 대한 내 답과, 실제로 정한 매핑 -->
+**내 답 (03 문서 1장):** 호스트 이름 `WS-007`은 **keyword**로 저장한다. text로 저장하면 분석기가 `ws`, `007`처럼 쪼개고 소문자로 바꿔서, 정확히 그 PC만 고르는 필터와 PC별 집계가 틀어진다. 실제로 `_analyze`에 `WS-006`을 넣으면 `["ws", "006"]`이 나온다.
+
+**정한 매핑** (`index_template.py`. `dynamic: strict`라서 `schema.py`의 칸을 전부 적었다)
+
+| 타입 | 칸 | 이유 |
+|---|---|---|
+| keyword | `event_id`, `host`, `type`, `process.name`·`parent_name`·`user`, `network.proto`, `file.action` | 통째로 같은지만 본다 (필터, 집계, 가드레일의 근거 id 대조) |
+| text + keyword(`.keyword`) | `process.cmdline`, `script_text`, `file.path`·`new_path`, `registry.key`·`value` | 단어 일부로 찾기(text)와 통째로 맞추기(keyword)를 둘 다 쓴다 |
+| date / long / ip / boolean | `ts` / `pid`·`ppid`·`dst_port`·`bytes_out` / `dst_ip` / `signed` | 범위 검색(시간, 숫자, IP 대역)과 정확한 비교 |
+
+**`sim.jsonl` 3,161건을 넣고 확인한 것** (거절 0건)
+
+| 검색 | 결과 | 뜻 |
+|---|---|---|
+| `term host = "WS-006"` (keyword) | 349건 | 정확히 그 PC의 기록 |
+| `term host = "ws-006"` (keyword) | 0건 | keyword는 대소문자까지 그대로 비교한다 |
+| `match process.cmdline "comsvcs.dll MiniDump"` (text) | 4건 | 단어 일부로 찾기 (rundll32 기록 2건 + 덤프 파일 기록 2건) |
+| `term process.cmdline.keyword = "comsvcs.dll"` | 0건 | keyword는 일부만으로는 못 찾는다 |
+| `term process.cmdline.keyword = 명령줄 전체` | 4건 | 통째로 맞추기 |
+| `term process.cmdline = 명령줄 전체` (text 칸에 term) | 0건 | text 칸은 쪼개서 저장되므로 term으로는 안 맞는다 |
+| `term host` + `range ts` (WS-006, 09:27~09:28) | 9건 | REC-4 타임라인 검색의 모양 |
+
+**포기한 것**
+- 명령줄 같은 칸을 두 번 저장해서 저장 공간이 늘어난다. keyword 쪽은 1024자가 넘으면 색인하지 않는다(가장 긴 명령줄은 319자). 그보다 긴 명령줄은 통째로 맞추기가 안 되고 단어 검색만 된다.
+- keyword는 대소문자를 구분하므로, 도구에 들어오는 `host` 값은 기록과 같은 대문자(`WS-007`)여야 한다.
+- `strict`라서 스키마에 칸이 생기면 템플릿도 같이 고쳐야 한다. 대신 오타 난 칸이 몰래 새 칸으로 생기는 일이 없다.
 
 ## 📘 문서 담당
 
