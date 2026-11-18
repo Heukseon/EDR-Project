@@ -5,7 +5,24 @@
 ## 🔍 기록 담당
 
 ### 데이터 관찰 (1일차)
-<!-- 공격 시나리오 하나의 기록을 시간순으로. pid → ppid 족보 -->
+`python -m soc.simulator.run --dump data/sim.jsonl`로 만든 데이터셋: 기록 3,161건(PC 11대, 09:00~10:00 한 시간), 정답 라벨 14건. type별로 process 1,604 / network 1,233 / file 318 / script 4 / registry 2.
+
+**`credential_dump` 시나리오 하나 (sc-004, WS-006, 사용자 kim), 시간순**
+
+| 시각 | event_id | type | pid ← ppid | 프로세스 | 내용 |
+|---|---|---|---|---|---|
+| 09:27:40.972 | evt-00003005 | process | 20558 ← 4222 | cmd.exe (부모 explorer.exe) | `cmd.exe` |
+| 09:27:41.972 | evt-00003006 | process | 46643 ← 20558 | rundll32.exe (부모 cmd.exe) | `rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump 668 C:\Windows\Temp\d.dmp full` |
+| 09:27:42.972 | evt-00003007 | file | 46643 ← 20558 | rundll32.exe | `C:\Windows\Temp\d.dmp` 생성 |
+
+**족보 (pid → ppid):** rundll32.exe 46643 → cmd.exe 20558 → explorer.exe 4222 (생성 기록이 없어 여기서 끊김). 같은 PC의 다른 `credential_dump`(sc-003, 09:41, 사용자 cho)도 pid만 다르고 모양이 같다. 샘플 24줄의 WS-007 이야기(cmd.exe 19329 → rundll32.exe 40702 → `d.dmp`)와도 같다.
+
+**관찰한 것과 도구 설계에 주는 뜻**
+1. **같은 PC 안에서도 pid가 재사용된다.** WS-006의 pid 20558은 09:27:40에 cmd.exe(공격)로, 09:32:03에 svchost.exe(정상, 부모 services.exe)로 두 번 생성됐다. host와 pid로만 찾아서 가장 최근 기록을 고르면 rundll32.exe의 부모가 svchost.exe로 나오고, 공격이 정상처럼 보인다. → REC-2는 부모를 찾을 때 **자식보다 먼저 생성된 기록 중 가장 가까운 것**을 고른다.
+2. **다른 PC에도 같은 pid가 있다.** 생성 기록이 있는 pid 1,582개 중 21개가 여러 PC에 나온다. → 모든 도구는 `host`를 반드시 조건에 넣는다. 테스트의 WS-099 함정과 같은 이유다.
+3. **족보는 대부분 중간에 끊긴다.** 프로세스 1,603개 중 1,215개(76%)는 부모의 생성 기록이 데이터에 없다. 데이터가 한 시간뿐이라 explorer.exe처럼 먼저 떠 있던 부모는 기록이 없다. 그래도 `parent_name` 칸에는 부모 이름이 남아 있다. → REC-2는 끊긴 지점에서 예외를 내지 않고, 계약대로 `note`에 "pid 4222(explorer.exe)의 생성 기록 없음"처럼 적는다.
+4. **기록만 봐서는 LSASS인지 알 수 없다.** MiniDump 대상인 pid 668의 기록이 없고, 데이터 어디에도 "lsass"라는 글자가 없다. 근거는 명령줄(`comsvcs.dll, MiniDump`)과 덤프 파일(`d.dmp`) 생성 기록뿐이다. rundll32.exe는 `signed=True`라서 서명 여부로는 거를 수 없다(정상 프로그램 악용). → 명령줄을 요약해도 `comsvcs.dll, MiniDump`가 있는 앞부분은 남는다. 가장 긴 명령줄은 319자다.
+5. **10분 타임라인은 100건을 넘는다.** WS-006에서 공격 시각 앞뒤 ±1분은 11~19건, ±5분은 55~66건, ±10분은 108~152건이다. → `get_host_timeline`을 기본값(minutes=10, 최대 100건)으로 부르면 `truncated: true`가 된다. 기본 범위를 줄일지 중간 나눔에서 상의한다.
 
 ### text vs keyword (1일차)
 <!-- 03 문서 1장의 질문에 대한 내 답과, 실제로 정한 매핑 -->
