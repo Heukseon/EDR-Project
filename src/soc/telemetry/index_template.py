@@ -17,7 +17,9 @@ from pathlib import Path
 from ..config import settings
 from ..osclient import bulk_index, get_client
 
-TEMPLATE_NAME = "edr-events"
+# 템플릿 이름을 인덱스 이름에서 가져옵니다. 이름이 고정이면 테스트(INDEX_EVENTS=test-edr-events)가
+# 실습용 템플릿을 test-edr-events-* 패턴으로 덮어써서, 그 뒤에 새로 생기는 날짜 인덱스가 매핑 없이 만들어집니다.
+TEMPLATE_NAME = settings.index_events
 
 
 def build_template() -> dict:
