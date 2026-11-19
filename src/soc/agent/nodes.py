@@ -114,13 +114,32 @@ def after_guardrail(state: TriageState) -> str:
 
 
 # ---------------------------------------------------------------------------- 권고
+PLAYBOOK_K = 3      # 계약의 기본값. 조각이 길어서 늘리면 권고 단계의 입력 토큰이 그만큼 늘어납니다
+
+
 def recommend(state: TriageState) -> dict:
     """권고 노드: 📘 플레이북 검색으로 근거를 찾고, LLM이 조치를 권고합니다."""
     v, alert = state["verdict"], state["alert"]
     # TODO[AG-2]: search_playbook_fn()으로 플레이북을 검색합니다. 질문은 알림 제목과 판정(기법)으로 만들고,
     # 판정과 검색 결과를 LLM에 넘겨 Recommendation 형식으로 권고를 받습니다.
     # 돌려줄 것: playbook(검색 결과), recommendation(dict), trace ["권고"], usage
-    raise NotImplementedError("TODO[AG-2]")
+    # 질문: 알림 제목 + 판정 기법 + "대응 조치 승인권자" (공격 유형별 절차와 조치별 승인권자를 같이 찾으려고)
+    query = " ".join([alert.get("title") or "", *v.get("techniques", []), "대응 조치 승인권자"]).strip()
+    try:
+        hits = search_playbook_fn()(query, k=PLAYBOOK_K)
+        search_error = None
+    except Exception as e:  # noqa: BLE001  검색이 죽어도 리포트는 나오게 합니다. LLM에는 오류를 알리고, 리포트의 sources는 비게 됩니다
+        hits, search_error = [], f"{type(e).__name__}: {e}"
+    keep = ("alert_id", "host", "title", "severity")
+    ctx = {"alert": {k: alert.get(k) for k in keep}, "verdict": v, "playbook": hits}
+    if search_error:
+        ctx["search_error"] = search_error
+    llm = get_llm().with_structured_output(Recommendation, include_raw=True)
+    out = llm.invoke([SystemMessage(content=prompt("recommend")),
+                      HumanMessage(content=f"판정과 플레이북 검색 결과:\n```json\n"
+                                           f"{json.dumps(ctx, ensure_ascii=False, indent=1)}\n```")])
+    return {"playbook": hits, "recommendation": out["parsed"].model_dump(), "trace": ["권고"],
+            "usage": usage_of(out["raw"])}
 
 
 # ---------------------------------------------------------------------------- 사람 승인 (2일차, 운전 🔍)
