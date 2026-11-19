@@ -2,13 +2,39 @@
 
 > 2일차 인프라 2단계를 시작하기 전에 계산합니다. 2단계 운전자(🔍 기록 담당)가 주도하고, 📘 문서 담당이 검토합니다.
 
+> **초안 (11-19, 🔍 김진홍).** 2·3일차 결석이라 미리 계산했다. 서버를 받기 전이라 vCPU는 **4개로 가정**했고, 메모리는 이 문서 제목의 16GB를 썼다.
+> 📘 최재우가 서버에서 `nproc`, `free -h`, `kubectl top`으로 잰 값과 맞춰 보고, 다르면 고친 뒤 검토란에 이름을 적는다.
+> 앱 쪽 메모리는 11-19 김진홍 Mac에서 쟀다. 컨테이너는 `docker stats`, 파이썬 프로세스는 `/usr/bin/time -l`의 최대 RSS다.
+
 | 워크로드 | 종류 | CPU req | Mem req / limit | 힙 | 근거 |
 |---|---|---|---|---|---|
-| OS + k3s + Traefik | - | | | - | 실측: `free -h`, `kubectl top` |
-| opensearch | StatefulSet | | | | |
-| postgres | StatefulSet | | | - | |
-| api | Deployment | | | - | |
-| worker | Deployment | | | - | |
-| generator | Deployment | | | - | |
-| kb-ingest (일시적) | Job | | | - | |
-| **합계 / 여유** | | | | | |
+| OS + k3s + Traefik | - | (500m 남겨 둠) | (약 1.5Gi 남겨 둠) | - | 실측: `free -h`, `kubectl top`. **서버에서 재서 이 칸을 고친다.** 지금 값은 k3s 서버 + containerd + Traefik + CoreDNS를 넉넉히 잡은 추정 |
+| opensearch | StatefulSet | 1000m (limit 2000m) | **4Gi / 4Gi** | **2g** (`-Xms2g -Xmx2g`) | 규칙: 힙 ≈ limit의 50%. 나머지 절반은 Lucene 파일 캐시와 k-NN 벡터(힙 밖)가 쓴다. 로컬에서 힙 1g일 때 컨테이너가 이미 1.63GiB를 썼다(힙 밖 약 0.6GiB). 3일 동안 생성기가 쌓는 기록과 벡터 검색 여유를 보고 힙을 2g로 올렸다. req = limit으로 두어 메모리가 모자랄 때 먼저 쫓겨나지 않게 한다(Guaranteed) |
+| postgres | StatefulSet | 100m (limit 500m) | 256Mi / 512Mi | - | 로컬 실측 22MiB. 체크포인트(알림 하나에 8개 행)뿐이라 작다. 3일차 pgvector(과거 사례 검색) 고도화를 고르면 다시 계산 |
+| api | Deployment | 100m (limit 500m) | 256Mi / 512Mi | - | 로컬 실측 최대 118MiB (앱 기동 + `/readyz`). 요청이 몰려도 LLM은 워커가 부르므로 API는 가볍다 |
+| worker | Deployment | 100m (limit 1000m) | 256Mi / 512Mi | - | 로컬 실측 최대 100MiB (알림 하나를 끝까지 처리). 대부분 LLM 응답을 기다리는 시간이라 CPU는 거의 안 쓴다. replicas 2로 늘리면 req 256Mi씩 더함 |
+| generator | Deployment | 50m (limit 200m) | 128Mi / 256Mi | - | 로컬 실측 37MiB (시뮬레이터 + 탐지 룰 적재). 5초마다 기록 몇십 건을 보내는 정도 |
+| kb-ingest (일시적) | Job | 500m (limit 2000m) | 1Gi / 2Gi | - | 로컬 실측 최대 515MiB (`fast`, PDF 9개). PDF 파싱은 CPU를 많이 쓴다(01번 첫 파싱 35초). **`hi_res`로 바꾸면 레이아웃 모델을 올려서 몇 GiB가 필요하다. 3일차에 고르면 다시 계산** |
+| **합계 / 여유** | | **req 2350m / 4000m** (여유 1650m) | **req 7.4Gi, limit 합 9.3Gi / 16Gi** (limit을 다 써도 약 6Gi 남음) | | 여유는 3일차 고도화(Langfuse, 워커 확장, `hi_res` 적재 등)에 쓴다 |
+
+## 계산 방법
+- **requests**는 스케줄러가 "이만큼은 보장"하고 자리를 잡는 값이다. 노드에 올라간 파드의 requests 합이 노드 용량을 넘으면 새 파드가 `Pending`이 된다(깨 보기 2-4).
+- **limits**는 넘으면 멈추는 상한이다. 메모리 limit을 넘으면 `OOMKilled`(깨 보기 2-2: 힙 2g에 limit 2Gi). CPU limit을 넘으면 느려질 뿐 죽지는 않는다.
+- 합계: CPU req = 500(시스템) + 1000 + 100 + 100 + 100 + 50 + 500 = 2350m. 메모리 req = 1.5 + 4 + 0.25 × 3 + 0.125 + 1 ≈ 7.4Gi.
+- kb-ingest는 잠깐 도는 Job이지만, 도는 동안에는 requests 자리가 있어야 뜬다. 그래서 합계에 넣었다.
+
+## 저장 공간 (PVC)
+| PVC | 크기 | 근거 |
+|---|---|---|
+| opensearch | 10Gi | 실습 데이터 3,161건이 576KB(한 건 약 180바이트). 생성기는 5초마다 정상 활동 5묶음(묶음당 기록 평균 2.5건, 500번 재 봄)이라 하루 약 20만 건, 약 40MB. 3일이면 120MB 정도라 10Gi면 충분하다 |
+| postgres | 2Gi | 체크포인트만 저장. 알림 하나에 수십 KB |
+
+## 비용 주의 (LLM)
+- 생성기는 24틱(2분)마다 공격이나 오탐 유도 상황을 하나 넣는다. 그러면 알림이 생기고 워커가 LLM을 부른다.
+- 11-19 측정에서 알림 하나가 $0.0047(입력 27,662토큰)이었다(`DECISIONS.md` "사람 승인과 상태 저장"). 시간당 약 30건이면 **하루 약 $3.4**다.
+- 밤새 켜 둘 필요가 없으면 `kubectl -n soc scale deploy/generator --replicas=0`으로 멈춰 둔다.
+
+## 검토
+- 🔍 주도: 김진홍 (11-19, 서버 받기 전 초안)
+- 📘 검토: 
+- 서버 실측 (`nproc` / `free -h` / `kubectl top nodes`): 
