@@ -155,7 +155,30 @@ def approval(state: TriageState) -> dict:
     # (01번 정책 PDF 5장: 대상 호스트, 판정과 신뢰도, ATT&CK 기법, 근거 event_id, 권고 조치)
     # 재개되면 interrupt()가 사람의 결정({"approved": bool, "approver": str, "comment": str})을 돌려줍니다.
     # 돌려줄 것: approval {"required", "decision", ...}, trace ["승인"]
-    return {"approval": {"required": bool(risky), "decision": "not_implemented"}, "trace": ["승인"]}
+    if not risky:
+        return {"approval": {"required": False, "decision": "not_required"}, "trace": ["승인"]}
+    v, alert = state["verdict"], state["alert"]
+    request = {                                   # 승인권자가 보는 화면 = 01번 정책 PDF 5장의 항목
+        "alert_id": alert["alert_id"], "host": alert["host"], "title": alert.get("title"),
+        "verdict": v["verdict"], "confidence": v["confidence"], "techniques": v.get("techniques", []),
+        "evidence_event_ids": v.get("evidence_event_ids", []), "reasoning": v.get("reasoning"),
+        "needs_review": v.get("needs_review", False),
+        "actions": risky,                                                  # 승인할 조치 (승인권자, 출처 포함)
+        "other_actions": [a for a in actions if a["action"] not in DANGEROUS_ACTIONS],   # 승인 없이 하는 조치
+        "summary": state["recommendation"].get("summary"),
+    }
+    # 여기서 멈춥니다. 상태는 체크포인터에 저장되고, API가 Command(resume=결정)으로 부르면 이 노드가 처음부터 다시
+    # 실행되어 interrupt()가 결정을 돌려줍니다. 그래서 이 위에는 저장·전송처럼 두 번 하면 안 되는 일을 두지 않습니다.
+    decision = interrupt(request)
+    if not isinstance(decision, dict):
+        decision = {"approved": bool(decision)}
+    approved = bool(decision.get("approved"))
+    return {"approval": {
+        "required": True, "decision": "approved" if approved else "rejected", "approved": approved,
+        "approver": decision.get("approver"), "comment": decision.get("comment", ""),
+        "actions": [a["action"] for a in risky],
+        "decided_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }, "trace": ["승인"]}
 
 
 # ---------------------------------------------------------------------------- 리포트

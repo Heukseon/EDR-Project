@@ -40,7 +40,7 @@ graph TD;
 | 판정 | 조사 대화를 보고 악성 / 의심 / 정상을 `Verdict` 형식으로 답함 | `messages` | `verdict`, `trace`, `usage` | 없음 | |
 | 가드레일 | 판정의 근거 id가 실제로 조회한 기록인지 검사. 실패하면 다시 조사시키거나 '의심'으로 낮춤 (검사 내용은 2일차 G-1, G-2) | `verdict`, `seen_event_ids`, `alert`, `guardrail_retries` | `guardrail`, `guardrail_log`, `trace`, 실패 시 `guardrail_retries`와 `messages` 또는 낮춘 `verdict` | 없음 | 📘 |
 | 권고 | 알림 제목과 판정 기법으로 플레이북을 검색하고, LLM이 조치를 `Recommendation` 형식으로 권고 | `verdict`, `alert` | `playbook`, `recommendation`, `trace`, `usage` | 📘 플레이북 검색 | 🔍 |
-| 승인 | 위험한 조치가 있으면 멈추고 사람의 결정을 기다림 (2일차 H-1 전까지는 통과만) | `recommendation` | `approval`, `trace` | 없음 | 🔍 |
+| 승인 | 위험한 조치가 있으면 `interrupt()`로 멈추고 승인 요청(호스트, 판정과 신뢰도, 기법, 근거 id, 승인할 조치와 승인권자)을 넘김. 재개되면 결정(`approved`, `approver`, `comment`)을 기록. 위험한 조치가 없으면 `not_required`로 통과 (H-1, 11-19 김진홍) | `recommendation`, `verdict`, `alert` | `approval`, `trace` | 없음 | 🔍 |
 | 리포트 | 판정, 근거, 권고, 출처, 승인 결과, 비용을 한 장으로 정리 | `alert`, `verdict`, `guardrail`, `guardrail_log`, `recommendation`, `playbook`, `approval`, `tool_rounds`, `usage`, `trace` | `report`, `trace` | 없음 | |
 
 ## 2. 갈림길

@@ -24,13 +24,24 @@ def _kind() -> str:
 @lru_cache(maxsize=1)
 def get_checkpointer():
     if _kind() == "memory":
+        log.info("체크포인터: memory (프로세스가 끝나면 진행 상황이 사라집니다)")
         return InMemorySaver()
     # TODO[H-2]: Postgres에 상태를 저장하는 PostgresSaver를 만들어 돌려줍니다.
     # psycopg 연결 풀을 settings.postgres_dsn으로 만들고(연결 옵션: autocommit=True, prepare_threshold=0, row_factory=dict_row),
     # PostgresSaver(풀)을 만든 뒤 setup()을 한 번 실행합니다 (체크포인트 테이블 생성, 여러 번 실행해도 안전).
     # API는 여러 요청을 동시에 처리하므로 연결 하나보다 풀이 안전합니다.
-    log.warning("TODO[H-2] 전: Postgres 대신 메모리에 저장합니다")
-    return InMemorySaver()
+    from langgraph.checkpoint.postgres import PostgresSaver
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+
+    pool = ConnectionPool(
+        conninfo=settings.postgres_dsn, min_size=1, max_size=5, open=True,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+    )
+    saver = PostgresSaver(pool)
+    saver.setup()       # checkpoints 등 테이블 생성. 이미 있으면 그대로 둡니다
+    log.info("체크포인터: postgres (승인 대기 중에 프로세스가 바뀌어도 이어 갈 수 있습니다)")   # DSN은 비밀번호가 있어 남기지 않음
+    return saver
 
 
 def ping() -> bool:
